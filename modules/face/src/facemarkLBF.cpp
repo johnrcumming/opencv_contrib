@@ -36,6 +36,8 @@ Mentor: Delia Passalacqua
 
 #include "precomp.hpp"
 #include "opencv2/face.hpp"
+#include "../../../opencv/modules/imgcodecs/include/opencv2/imgcodecs.hpp"
+#include <sys/stat.h>
 #include <fstream>
 #include <cmath>
 #include <ctime>
@@ -637,12 +639,47 @@ void FacemarkLBFImpl::data_augmentation(std::vector<Mat> &imgs, std::vector<Mat>
             SWAP(gt_shapes[i], 68, 66);
         }
     }
-    else {
-        printf("Wrong n_landmarks, currently only 29 and 68 landmark points are supported");
+    else if (params.n_landmarks == 194) {
+        for (int i = N; i < (int)gt_shapes.size(); i++) { 
+            for (int k = 1; k <= 20; k++) SWAP(gt_shapes[i], k, 41+1-k); // Chin            
+            for (int k = 42; k <= 49; k++) SWAP(gt_shapes[i], k, 58+42-k); // Nose
+            for (int k = 59; k <= 64; k++) SWAP(gt_shapes[i], k, 70+59-k); // Outside Upper Lip
+            for (int k = 79; k <= 86; k++) SWAP(gt_shapes[i], k, 78+79-k); // Outside Lower Lip
+            for (int k = 87; k <= 92; k++) SWAP(gt_shapes[i], k, 99+87-k); // Inside Upper Lip
+            for (int k = 108; k <= 114; k++) SWAP(gt_shapes[i], k, 106+108-k); // Inside Lower Lip
+            for (int k = 135; k <= 154; k++) SWAP(gt_shapes[i], k, 115+k-135); // Eye
+            for (int k = 175; k <= 194; k++) SWAP(gt_shapes[i], k, 155+k-175); // Eye Brow
+
+        }
     }
 
 #undef SWAP
+#ifdef DEBUG_LANDMARKS_194
+        if (mkdir("debug", S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == -1 && errno != EEXIST) {
+            fprintf(stderr, "Can't create debug directory\n");
+            return;
+        }
+        int lr[194];
+        for (int i = 1; i <= 194; i++) {
+            lr[i-1] = (i>=1 && i<=20) || (i>=42 && i<=49) || (i>=59 && i<=64) || (i>=79 && i<=86) || (i>=87 && i<=92)|| (i>=108 && i<=114) || (i>=135 && i<=154) || (i>=175 && i<=194);
+        }
 
+        for (int i = 0; i < (int)gt_shapes.size(); i++) { 
+            cv::Mat limg;
+            std::string path = "debug/image_";
+            path += std::to_string(i);
+            path += ".png";            
+            
+            imgs[i].copyTo(limg);
+            for (int j = 0; j < gt_shapes[i].rows; j++) {
+                if (lr[j])
+                    cv::circle(limg, cv::Point(gt_shapes[i].at<double>(j, 0), gt_shapes[i].at<double>(j, 1)), 2, CV_RGB(0,0,0));
+                else
+                    cv::circle(limg, cv::Point(gt_shapes[i].at<double>(j, 0), gt_shapes[i].at<double>(j, 1)), 2, CV_RGB(255,255,255));
+            }
+            cv::imwrite(path, limg);
+        }
+#endif
 }
 
 FacemarkLBFImpl::BBox::BBox() {}
