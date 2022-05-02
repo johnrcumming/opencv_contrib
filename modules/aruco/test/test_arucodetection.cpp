@@ -246,6 +246,13 @@ static Mat projectMarker(Ptr<aruco::Dictionary> &dictionary, int id, Mat cameraM
     return img;
 }
 
+enum class ArucoAlgParams
+{
+    USE_DEFAULT = 0,
+    USE_APRILTAG=1,             /// Detect marker candidates :: using AprilTag
+    DETECT_INVERTED_MARKER,     /// Check if there is a white marker
+    USE_ARUCO3                  /// Check if aruco3 should be used
+};
 
 
 /**
@@ -253,22 +260,15 @@ static Mat projectMarker(Ptr<aruco::Dictionary> &dictionary, int id, Mat cameraM
  */
 class CV_ArucoDetectionPerspective : public cvtest::BaseTest {
     public:
-    CV_ArucoDetectionPerspective();
-
-    enum checkWithParameter{
-        USE_APRILTAG=1,             /// Detect marker candidates :: using AprilTag
-        DETECT_INVERTED_MARKER,     /// Check if there is a white marker
-    };
+    CV_ArucoDetectionPerspective(ArucoAlgParams arucoAlgParam) : arucoAlgParams(arucoAlgParam) {}
 
     protected:
     void run(int);
+    ArucoAlgParams arucoAlgParams;
 };
 
 
-CV_ArucoDetectionPerspective::CV_ArucoDetectionPerspective() {}
-
-
-void CV_ArucoDetectionPerspective::run(int tryWith) {
+void CV_ArucoDetectionPerspective::run(int) {
 
     int iter = 0;
     int szEnclosed = 0;
@@ -297,13 +297,18 @@ void CV_ArucoDetectionPerspective::run(int tryWith) {
                     projectMarker(dictionary, currentId, cameraMatrix, deg2rad(yaw), deg2rad(pitch),
                                       distance, imgSize, markerBorder, groundTruthCorners, szEnclosed);
                 // marker :: Inverted
-                if(CV_ArucoDetectionPerspective::DETECT_INVERTED_MARKER == tryWith){
+                if(ArucoAlgParams::DETECT_INVERTED_MARKER == arucoAlgParams){
                     img = ~img;
                     params->detectInvertedMarker = true;
                 }
 
-                if(CV_ArucoDetectionPerspective::USE_APRILTAG == tryWith){
+                if(ArucoAlgParams::USE_APRILTAG == arucoAlgParams){
                     params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_APRILTAG;
+                }
+
+                if (ArucoAlgParams::USE_ARUCO3 == arucoAlgParams) {
+                    params->useAruco3Detection = true;
+                    params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_SUBPIX;
                 }
 
                 // detect markers
@@ -331,7 +336,7 @@ void CV_ArucoDetectionPerspective::run(int tryWith) {
             }
         }
         // change the state :: to detect an enclosed inverted marker
-        if( CV_ArucoDetectionPerspective::DETECT_INVERTED_MARKER == tryWith && distance == 0.1 ){
+        if(ArucoAlgParams::DETECT_INVERTED_MARKER == arucoAlgParams && distance == 0.1){
             distance -= 0.1;
             szEnclosed++;
         }
@@ -523,15 +528,21 @@ void CV_ArucoBitCorrection::run(int) {
 
 typedef CV_ArucoDetectionPerspective CV_AprilTagDetectionPerspective;
 typedef CV_ArucoDetectionPerspective CV_InvertedArucoDetectionPerspective;
+typedef CV_ArucoDetectionPerspective CV_Aruco3DetectionPerspective;
 
 TEST(CV_InvertedArucoDetectionPerspective, algorithmic) {
-    CV_InvertedArucoDetectionPerspective test;
-    test.safe_run(CV_ArucoDetectionPerspective::DETECT_INVERTED_MARKER);
+    CV_InvertedArucoDetectionPerspective test(ArucoAlgParams::DETECT_INVERTED_MARKER);
+    test.safe_run();
 }
 
 TEST(CV_AprilTagDetectionPerspective, algorithmic) {
-    CV_AprilTagDetectionPerspective test;
-    test.safe_run(CV_ArucoDetectionPerspective::USE_APRILTAG);
+    CV_AprilTagDetectionPerspective test(ArucoAlgParams::USE_APRILTAG);
+    test.safe_run();
+}
+
+TEST(CV_Aruco3DetectionPerspective, algorithmic) {
+    CV_Aruco3DetectionPerspective test(ArucoAlgParams::USE_ARUCO3);
+    test.safe_run();
 }
 
 TEST(CV_ArucoDetectionSimple, algorithmic) {
@@ -540,7 +551,7 @@ TEST(CV_ArucoDetectionSimple, algorithmic) {
 }
 
 TEST(CV_ArucoDetectionPerspective, algorithmic) {
-    CV_ArucoDetectionPerspective test;
+    CV_ArucoDetectionPerspective test(ArucoAlgParams::USE_DEFAULT);
     test.safe_run();
 }
 
@@ -594,10 +605,10 @@ TEST(CV_ArucoTutorial, can_find_gboriginal)
     string imgPath = cvtest::findDataFile("gboriginal.png", false);
     Mat image = imread(imgPath);
     string dictPath = cvtest::findDataFile("tutorial_dict.yml", false);
-    cv::Ptr<cv::aruco::Dictionary> dictionary;
+    Ptr<aruco::Dictionary> dictionary = makePtr<aruco::Dictionary>();
 
     FileStorage fs(dictPath, FileStorage::READ);
-    aruco::Dictionary::readDictionary(fs.root(), dictionary); // set marker from tutorial_dict.yml
+    dictionary->aruco::Dictionary::readDictionary(fs.root()); // set marker from tutorial_dict.yml
 
     Ptr<aruco::DetectorParameters> detectorParams = aruco::DetectorParameters::create();
 
@@ -643,5 +654,165 @@ TEST(CV_ArucoTutorial, can_find_gboriginal)
         }
     }
 }
+
+TEST(CV_ArucoDetectMarkers, regression_3192)
+{
+    Ptr<aruco::Dictionary> dictionary = aruco::getPredefinedDictionary(aruco::DICT_4X4_50);
+    Ptr<aruco::DetectorParameters> detectorParams = aruco::DetectorParameters::create();
+    vector< int > markerIds;
+    vector<vector<Point2f> > markerCorners;
+    string imgPath = cvtest::findDataFile("aruco/regression_3192.png");
+    Mat image = imread(imgPath);
+    const size_t N = 2ull;
+    const int goldCorners[N][8] = { {345,120, 520,120, 520,295, 345,295}, {101,114, 270,112, 276,287, 101,287} };
+    const int goldCornersIds[N] = { 6, 4 };
+    map<int, const int*> mapGoldCorners;
+    for (size_t i = 0; i < N; i++)
+        mapGoldCorners[goldCornersIds[i]] = goldCorners[i];
+
+    aruco::detectMarkers(image, dictionary, markerCorners, markerIds, detectorParams);
+
+    ASSERT_EQ(N, markerIds.size());
+    for (size_t i = 0; i < N; i++)
+    {
+        int arucoId = markerIds[i];
+        ASSERT_EQ(4ull, markerCorners[i].size());
+        ASSERT_TRUE(mapGoldCorners.find(arucoId) != mapGoldCorners.end());
+        for (int j = 0; j < 4; j++)
+        {
+            EXPECT_NEAR(static_cast<float>(mapGoldCorners[arucoId][j * 2]), markerCorners[i][j].x, 1.f);
+            EXPECT_NEAR(static_cast<float>(mapGoldCorners[arucoId][j * 2 + 1]), markerCorners[i][j].y, 1.f);
+        }
+    }
+}
+
+TEST(CV_ArucoDetectMarkers, regression_2492)
+{
+    Ptr<aruco::Dictionary> dictionary = aruco::getPredefinedDictionary(aruco::DICT_5X5_50);
+    Ptr<aruco::DetectorParameters> detectorParams = aruco::DetectorParameters::create();
+    detectorParams->minMarkerDistanceRate = 0.026;
+    vector< int > markerIds;
+    vector<vector<Point2f> > markerCorners;
+    string imgPath = cvtest::findDataFile("aruco/regression_2492.png");
+    Mat image = imread(imgPath);
+    const size_t N = 8ull;
+    const int goldCorners[N][8] = { {179,139, 179,95, 223,95, 223,139}, {99,139, 99,95, 143,95, 143,139},
+                                    {19,139, 19,95, 63,95, 63,139},     {256,140, 256,93, 303,93, 303,140},
+                                    {256,62, 259,21, 300,23, 297,64},   {99,21, 143,17, 147,60, 103,64},
+                                    {69,61, 28,61, 14,21, 58,17},       {174,62, 182,13, 230,19, 223,68} };
+    const int goldCornersIds[N] = {13, 13, 13, 13, 1, 15, 14, 4};
+    map<int, vector<const int*> > mapGoldCorners;
+    for (size_t i = 0; i < N; i++)
+        mapGoldCorners[goldCornersIds[i]].push_back(goldCorners[i]);
+
+    aruco::detectMarkers(image, dictionary, markerCorners, markerIds, detectorParams);
+
+    ASSERT_EQ(N, markerIds.size());
+    for (size_t i = 0; i < N; i++)
+    {
+        int arucoId = markerIds[i];
+        ASSERT_EQ(4ull, markerCorners[i].size());
+        ASSERT_TRUE(mapGoldCorners.find(arucoId) != mapGoldCorners.end());
+        float totalDist = 8.f;
+        for (size_t k = 0ull; k < mapGoldCorners[arucoId].size(); k++)
+        {
+            float dist = 0.f;
+            for (int j = 0; j < 4; j++) // total distance up to 4 points
+            {
+                dist += abs(mapGoldCorners[arucoId][k][j * 2] - markerCorners[i][j].x);
+                dist += abs(mapGoldCorners[arucoId][k][j * 2 + 1] - markerCorners[i][j].y);
+            }
+            totalDist = min(totalDist, dist);
+        }
+        EXPECT_LT(totalDist, 8.f);
+    }
+}
+
+struct ArucoThreading: public testing::TestWithParam<cv::aruco::CornerRefineMethod>
+{
+    struct NumThreadsSetter {
+        NumThreadsSetter(const int num_threads)
+        : original_num_threads_(cv::getNumThreads()) {
+            cv::setNumThreads(num_threads);
+        }
+
+        ~NumThreadsSetter() {
+            cv::setNumThreads(original_num_threads_);
+        }
+     private:
+        int original_num_threads_;
+    };
+};
+
+TEST_P(ArucoThreading, number_of_threads_does_not_change_results)
+{
+    cv::Ptr<cv::aruco::DetectorParameters> params = cv::aruco::DetectorParameters::create();
+    // We are not testing against different dictionaries
+    // As we are interested mostly in small images, smaller
+    // markers is better -> 4x4
+    cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
+
+    // Height of the test image can be chosen quite freely
+    // We aim to test against small images as in those the
+    // number of threads has most effect
+    const int height_img = 20;
+    // Just to get nice white boarder
+    const int shift = height_img > 10 ? 5 : 1;
+    const int height_marker = height_img-2*shift;
+
+    // Create a test image
+    cv::Mat img_marker;
+    cv::aruco::drawMarker(dictionary, 23, height_marker, img_marker, 1);
+
+    // Copy to bigger image to get a white border
+    cv::Mat img(height_img, height_img, CV_8UC1, cv::Scalar(255));
+    img_marker.copyTo(img(cv::Rect(shift, shift, height_marker, height_marker)));
+
+    params->cornerRefinementMethod = GetParam();
+
+    std::vector<std::vector<cv::Point2f> > original_corners;
+    std::vector<int> original_ids;
+    {
+        NumThreadsSetter thread_num_setter(1);
+        cv::aruco::detectMarkers(img, dictionary, original_corners, original_ids, params);
+    }
+
+    ASSERT_EQ(original_ids.size(), 1ull);
+    ASSERT_EQ(original_corners.size(), 1ull);
+
+    int num_threads_to_test[] = { 2, 8, 16, 32, height_img-1, height_img, height_img+1};
+
+    for (size_t i_num_threads = 0; i_num_threads < sizeof(num_threads_to_test)/sizeof(int); ++i_num_threads) {
+        NumThreadsSetter thread_num_setter(num_threads_to_test[i_num_threads]);
+
+        std::vector<std::vector<cv::Point2f> > corners;
+        std::vector<int> ids;
+        cv::aruco::detectMarkers(img, dictionary, corners, ids, params);
+
+        // If we don't find any markers, the test is broken
+        ASSERT_EQ(ids.size(), 1ull);
+
+        // Make sure we got the same result as the first time
+        ASSERT_EQ(corners.size(), original_corners.size());
+        ASSERT_EQ(ids.size(), original_ids.size());
+        ASSERT_EQ(ids.size(), corners.size());
+        for (size_t i = 0; i < corners.size(); ++i) {
+            EXPECT_EQ(ids[i], original_ids[i]);
+            for (size_t j = 0; j < corners[i].size(); ++j) {
+                EXPECT_NEAR(corners[i][j].x, original_corners[i][j].x, 0.1f);
+                EXPECT_NEAR(corners[i][j].y, original_corners[i][j].y, 0.1f);
+            }
+        }
+    }
+}
+
+INSTANTIATE_TEST_CASE_P(
+        CV_ArucoDetectMarkers, ArucoThreading,
+        ::testing::Values(
+            cv::aruco::CORNER_REFINE_NONE,
+            cv::aruco::CORNER_REFINE_SUBPIX,
+            cv::aruco::CORNER_REFINE_CONTOUR,
+            cv::aruco::CORNER_REFINE_APRILTAG
+        ));
 
 }} // namespace
