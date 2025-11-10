@@ -11,6 +11,8 @@ So, all the new modules should be developed separately, and published in the
 popularity, it is moved to the central OpenCV repository, and the development team
 provides production-quality support for this module.
 
+Note: The `face` module includes support for the 194-point LBF landmark model.
+
 ### How to build OpenCV with extra modules
 
 You can build OpenCV, so it will include the modules from this repository. Contrib modules are under constant development and it is recommended to use them alongside the master branch or latest releases of OpenCV.
@@ -51,7 +53,13 @@ If you prefer using the GUI version of CMake (cmake-gui), then, you can add `ope
 
 8. To run, linker flags to contrib modules will need to be added to use them in your code/IDE. For example to use the aruco module, "-lopencv_aruco" flag will be added.
 
-### Update the repository documentation
+### Face landmarks: LBF 194 model
+
+The `face` module now supports the 194-point LBF landmark model in addition to existing configurations. After building OpenCV with `opencv_contrib`, you can use `cv::face::FacemarkLBF` with a 194-landmark model to detect facial landmarks.
+
+For usage details and samples, see:
+- [modules/face/README.md](modules/face/README.md)
+- [modules/face/samples](modules/face/samples)### Update the repository documentation
 
 In order to keep a clean overview containing all contributed modules, the following files need to be created/adapted:
 
