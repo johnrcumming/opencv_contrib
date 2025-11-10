@@ -15,7 +15,7 @@ namespace ximgproc
 //! @addtogroup ximgproc_edge_drawing
 //! @{
 
-/** @brief Class implementing the ED (EdgeDrawing) @cite topal2012edge, EDLines @cite akinlar2011edlines, EDPF @cite akinlar2012edpf and EDCircles @cite akinlar2013edcircles algorithms
+/** @brief Class implementing the ED (EdgeDrawing) @cite topal2012edge, EDLines @cite akinlar2011edlines, EDPF @cite akinlar2012edpf, EDCircles @cite akinlar2013edcircles and ColorED @cite akinlar201782 algorithms.
 */
 
 class CV_EXPORTS_W EdgeDrawing : public Algorithm
@@ -66,13 +66,13 @@ public:
         //! Default value is 1.3
         CV_PROP_RW double MaxErrorThreshold;
 
-        void read(const FileNode& fn);
-        void write(FileStorage& fs) const;
+        CV_WRAP void read(const FileNode& fn);
+        CV_WRAP void write(FileStorage& fs) const;
     };
 
-    /** @brief Detects edges in a grayscale image and prepares them to detect lines and ellipses.
+    /** @brief Detects edges in a grayscale or color image and prepares them to detect lines and ellipses.
 
-    @param src 8-bit, single-channel, grayscale input image.
+    @param src 8-bit, single-channel (CV_8UC1) or color (CV_8UC3, CV_8UC4) input image.
     */
     CV_WRAP virtual void detectEdges(InputArray src) = 0;
 
@@ -115,7 +115,7 @@ public:
     /** @brief sets parameters.
 
     this function is meant to be used for parameter setting in other languages than c++ like python.
-    @param parameters
+    @param parameters Parameters of the algorithm
     */
     CV_WRAP void setParams(const EdgeDrawing::Params& parameters);
     virtual ~EdgeDrawing() { }

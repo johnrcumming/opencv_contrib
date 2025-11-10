@@ -113,6 +113,8 @@ ocv_add_module(matlab   BINDINGS
                                  opencv_calib opencv_calib3d
                                  opencv_stitching opencv_superres
                                  opencv_xfeatures2d
+				 opencv_optflow
+				 opencv_xphoto
 )
 
 # get the commit information
@@ -120,7 +122,7 @@ execute_process(COMMAND git log -1 --pretty=%H OUTPUT_VARIABLE GIT_COMMIT ERROR_
 string(REGEX REPLACE "(\r?\n)+$" "" GIT_COMMIT "${GIT_COMMIT}")
 
 # set the path to the C++ header and doc parser, and template engine
-set(HDR_PARSER_PATH ${CMAKE_SOURCE_DIR}/modules/python/src2)
+set(HDR_PARSER_PATH ${OpenCV_SOURCE_DIR}/modules/python/src2)
 
 # set mex compiler options
 prepend("-I" MEX_INCLUDE_DIRS ${CMAKE_BINARY_DIR})
@@ -156,6 +158,8 @@ endforeach()
 # add extra headers by hand
 list(APPEND opencv_extra_hdrs "core=${OPENCV_MODULE_opencv_core_LOCATION}/include/opencv2/core/base.hpp")
 list(APPEND opencv_extra_hdrs "video=${OPENCV_MODULE_opencv_video_LOCATION}/include/opencv2/video/tracking.hpp")
+list(APPEND opencv_extra_hdrs "optflow=${OPENCV_MODULE_opencv_optflow_LOCATION}/include/opencv2/optflow.hpp")
+
 
 # pass the OPENCV_CXX_EXTRA_FLAGS through to the mex compiler
 # remove the visibility modifiers, so the mex gateway is visible
@@ -234,7 +238,7 @@ add_custom_command(
     COMMAND ${PYTHON_DEFAULT_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/generator/gen_matlab.py
             --hdrparser  ${HDR_PARSER_PATH}
-            --moduleroot ${CMAKE_SOURCE_DIR}/modules ${OPENCV_EXTRA_MODULES_PATH}
+            --moduleroot ${OpenCV_SOURCE_DIR}/modules ${OPENCV_EXTRA_MODULES_PATH}
             --modules    ${opencv_modules}
             --extra      ${opencv_extra_hdrs}
             --outdir     ${CMAKE_CURRENT_BINARY_DIR}

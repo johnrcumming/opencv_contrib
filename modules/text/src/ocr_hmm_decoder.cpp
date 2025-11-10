@@ -208,7 +208,7 @@ public:
             vector<int> spaces_start;
             vector<int> spaces_end;
             int space_count=0;
-            int last_one_idx;
+            int last_one_idx=0;
 
             int s_init = 0, s_end=vector_w.cols;
             for (int s=0; s<vector_w.cols; s++)
@@ -456,7 +456,7 @@ public:
             vector<int> spaces_start;
             vector<int> spaces_end;
             int space_count=0;
-            int last_one_idx;
+            int last_one_idx=0;
 
             int s_init = 0, s_end=vector_w.cols;
             for (int s=0; s<vector_w.cols; s++)
@@ -1028,7 +1028,6 @@ void OCRHMMClassifierCNN::eval( InputArray _src, vector<int>& out_class, vector<
     Mat quad;
     Mat tmp;
 
-    int patch_count = 0;
     vector< vector<double> > data_pool(9);
 
 
@@ -1071,7 +1070,6 @@ void OCRHMMClassifierCNN::eval( InputArray _src, vector<int>& out_class, vector<
                         data_pool[7].insert(data_pool[7].end(),patch.begin(),patch.end());
                     if ((quad_id == 19)||(quad_id == 24)||(quad_id == 20)||(quad_id == 25))
                         data_pool[8].insert(data_pool[8].end(),patch.begin(),patch.end());
-                    patch_count++;
                 }
             }
 
